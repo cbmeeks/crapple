@@ -46,7 +46,7 @@ int crapple_init() {
     }
 
     // Init CPU
-    initCpu(&context);
+    cpu_init(&context);
     reset(&context);
     crapple_clear_text_page_1();
 
@@ -186,15 +186,25 @@ int crapple_loadFont(const char *filename) {
 
 void crapple_test() {
     // just for testing stuff
+
+    // Testing ADC
+    //  ADC #10
+    //  JMP $0000
+    cpu_poke(0x0000, 0x69); // ADC #$10
+    cpu_poke(0x0001, 0x10); // #$10 (operand)
+    cpu_poke(0x0002, 0x4C); // JMP (absolute)
+    cpu_poke(0x0003, 0x00); // $00
+    cpu_poke(0x0004, 0x00); // $20
+
+    // Testing JMP
     // Let's start with JMP $2000
-    cpu_poke(0x0000, 0x4C);     // JMP (absolute)
-    cpu_poke(0x0001, 0x00);     // $00
-    cpu_poke(0x0002, 0x20);     // $20
-
-    // Now put an INX in $2000 and jump to it forever
-    cpu_poke(0x2000, 0xE8);     // INX
-    cpu_poke(0x2001, 0x4C);     // JMP (absolute)
-    cpu_poke(0x2002, 0x00);     // $00
-    cpu_poke(0x2003, 0x20);     // $20
-
+    // cpu_poke(0x0000, 0x4C);     // JMP (absolute)
+    // cpu_poke(0x0001, 0x00);     // $00
+    // cpu_poke(0x0002, 0x20);     // $20
+    //
+    // // Now put an INX in $2000 and jump to it forever
+    // cpu_poke(0x2000, 0xE8);     // INX
+    // cpu_poke(0x2001, 0x4C);     // JMP (absolute)
+    // cpu_poke(0x2002, 0x00);     // $00
+    // cpu_poke(0x2003, 0x20);     // $20
 }

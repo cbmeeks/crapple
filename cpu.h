@@ -254,11 +254,11 @@ typedef enum _ExecutionResult {
 
 // Function prototypes
 // TODO change method names to cpu_
+// TODO change method names to snake_case
 void checkStatus(uint8_t value);
 ExecutionResult executeNext(ExecutionContext *context);
 Instruction *fetchInstruction(const uint8_t opcode);
 uint8_t fetchOpcode(const uint16_t address);
-void initCpu(ExecutionContext *context);
 uint16_t getInstructionLength(const Instruction *instruction);
 void printInstruction(const uint8_t opcode);
 void printStatus();
@@ -266,8 +266,10 @@ void reset(ExecutionContext *context);
 ExecutionResult tick(ExecutionContext *context);
 
 uint16_t cpu_getJumpAddress(AddressingMode mode);
-
+void cpu_init(ExecutionContext *context);
 void cpu_poke(uint16_t address, uint8_t value);
+void cpu_exec_adc(ExecutionContext *context, uint8_t operand);
+void cpu_exec_adc_bcd(ExecutionContext *context, uint8_t operand);
 
 // Inline functions
 inline uint8_t fetchOpcode(const uint16_t address) {
@@ -288,6 +290,6 @@ inline void printInstruction(const uint8_t opcode) {
 }
 
 inline void printStatus() {
-    printf("PC=%04X, A=%02X, X=%02X, Y=%02X, STATUS=%02X, STACKPTR=%04X\n",
-           PC, ACCUM, XREG, YREG, STATUS, STACKPTR);
+    printf("PC=%04X A=%02X X=%02X Y=%02X C=%d Z=%d I=%d D=%d O=%d N=%d\n",
+           PC, ACCUM, XREG, YREG, isCarry(), isZero(), isInterrupt(), isDecimal(), isOverflow(), isNegative());
 }
