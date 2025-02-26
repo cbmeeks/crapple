@@ -1,3 +1,0 @@
-/data/gdrive/Projects/Apple/crapple/cmake-build-debug/CMakeFiles/crapple.dir
-/data/gdrive/Projects/Apple/crapple/cmake-build-debug/CMakeFiles/edit_cache.dir
-/data/gdrive/Projects/Apple/crapple/cmake-build-debug/CMakeFiles/rebuild_cache.dir
