@@ -1,0 +1,200 @@
+#pragma once
+
+#include "crapple.h"
+#include <errno.h>
+#include <SDL2/SDL.h>
+#include "cpu.c"
+/**
+
+    ROMS:
+    https://github.com/AppleWin/AppleWin/tree/master/resource
+*/
+
+void crapple_render_text_page_1();
+
+int crapple_init() {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    window = SDL_CreateWindow("Crapple",
+                              SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                              WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+    if (!window) {
+        fprintf(stderr, "Window failed: %s\n", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    if (!renderer) {
+        fprintf(stderr, "Renderer failed: %s\n", SDL_GetError());
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                                SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
+    if (!texture) {
+        fprintf(stderr, "Texture failed: %s\n", SDL_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
+    // Init CPU
+    initCpu(&context);
+    reset(&context);
+    crapple_clear_text_page_1();
+
+    // Load 2 KiB font file
+    if (crapple_loadFont("../res/Apple2_Video.rom") != 0) {
+        fprintf(stderr, "Font loading failed\n");
+        crapple_terminate();
+        return 1;
+    }
+
+    // Rows 0–7: $0400–$047F (128 bytes).
+    // Rows 8–15: $0480–$04FF (128 bytes).
+    // Rows 16–23: $0500–$057F (128 bytes).
+    // MEMORY[0x0400] = 0xCE;
+    // MEMORY[0x0480] = 0xCE;
+    // MEMORY[0x0500] = 0xCE;
+
+    // for (int i = 0; i < 960; i++) {
+    //     // 40x24 = 960 chars
+    //     // MEMORY[0x0400 + i] = 0xC1 + (i % 26); // A-Z repeating
+    //     MEMORY[0x0400 + i] = i; // A-Z repeating
+    // }
+
+    return 0;
+}
+
+void crapple_update() {
+    const Uint32 frameTime = 1000 / 60; // 16.67 ms
+    Uint32 nextTime = SDL_GetTicks();
+
+    while (crapple_running) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) crapple_running = false;
+        }
+
+        // CPU update: Run ~17,050 cycles per frame
+        for (int i = 0; i < 17050; i++) {
+            tick(&context);
+            // printStatus();
+        }
+
+        // Update text page to pixels
+        crapple_render_text_page_1();
+
+        SDL_UpdateTexture(texture, NULL, pixels, WIDTH * sizeof(uint32_t));
+        SDL_RenderClear(renderer);
+        SDL_RenderCopy(renderer, texture, NULL, NULL);
+        SDL_RenderPresent(renderer);
+
+        const Uint32 currentTime = SDL_GetTicks();
+        if (currentTime < nextTime) {
+            SDL_Delay(nextTime - currentTime);
+        }
+        nextTime += frameTime;
+    }
+}
+
+void crapple_terminate() {
+    SDL_DestroyTexture(texture);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+}
+
+void crapple_clear_text_page_1() {
+    for (int i = 0x0400; i < 0x07F8; i++) {
+        MEMORY[i] = 0x20; // ' '
+    }
+    MEMORY[0x07D0] = 0x5D;
+}
+
+/**
+    Text Page 1: $0400–$07FF (1 KB).
+    Text Page 2: $0800–$0BFF (switchable via soft switches).
+
+    The text page is a 1 KB block (e.g., $0400–$07FF for Page 1),
+    but the 40x24 grid isn’t stored linearly.
+    Total Characters: 40 cols × 24 rows = 960 bytes (out of 1024 allocated).
+
+    Here’s how it works:
+
+    Each row is 40 characters ($28).  In a linear system, Row 0 would start
+    at $0400 and end at $0427 (40 characters).  Then, Row 1 would start at
+    $0428 and run to $0450.  But $0428 is the start of the row 8 (9th row).
+        Row 0:  $0400
+        Row 1:  $0480
+        Row 2:  $0500
+        Row 3:  $0580
+        Row 4:  $0600
+        Row 5:  $0680
+        Row 6:  $0700
+        Row 7:  $0780
+        Row 8:  $0428
+        ...
+ */
+void crapple_render_text_page_1() {
+    const uint16_t row_start_addresses[] = {
+        0x0400, 0x0480, 0x0500, 0x0580, 0x0600, 0x0680, 0x0700, 0x0780,
+        0x0428, 0x04A8, 0x0528, 0x05A8, 0x0628, 0x06A8, 0x0728, 0x07A8,
+        0X0450, 0x04D0, 0x0550, 0x05D0, 0x0650, 0x06D0, 0x0750, 0x07D0
+    };
+    for (int row = 0; row < 24; row++) {
+        for (int col = 0; col < 40; col++) {
+            uint8_t chr = MEMORY[row_start_addresses[row] + col];
+            if (chr >= 0x80) chr &= 0x7F; // Normal + inverse/flashing
+            for (int y = 0; y < 8; y++) {
+                const uint8_t glyphRow = font[chr & 0x7F][y]; // Mask to 0x00-0x7F
+                for (int x = 0; x < 7; x++) {
+                    int px = col * 7 + x; // Native 280x192
+                    int py = row * 8 + y;
+                    pixels[py * WIDTH + px] = (glyphRow & (1 << (6 - x))) ? 0xFF00FF00 : 0xFF000000;
+                }
+            }
+        }
+    }
+}
+
+int crapple_loadFont(const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    if (!file) {
+        fprintf(stderr, "Failed to open font file %s: %s\n", filename, strerror(errno));
+        return 1;
+    }
+
+    // Read first 1024 bytes (ignore repeat)
+    size_t bytesRead = fread(font, 1, 128 * 8, file);
+    if (bytesRead != 128 * 8) {
+        fprintf(stderr, "Font file %s incomplete: read %zu of 1024 bytes\n", filename, bytesRead);
+        fclose(file);
+        return 1;
+    }
+
+    fclose(file);
+    return 0;
+}
+
+void crapple_test() {
+    // just for testing stuff
+    // Let's start with JMP $2000
+    cpu_poke(0x0000, 0x4C);     // JMP (absolute)
+    cpu_poke(0x0001, 0x00);     // $00
+    cpu_poke(0x0002, 0x20);     // $20
+
+    // Now put an INX in $2000 and jump to it forever
+    cpu_poke(0x2000, 0xE8);     // INX
+    cpu_poke(0x2001, 0x4C);     // JMP (absolute)
+    cpu_poke(0x2002, 0x00);     // $00
+    cpu_poke(0x2003, 0x20);     // $20
+
+}
