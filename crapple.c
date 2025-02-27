@@ -89,18 +89,20 @@ int crapple_init_audio() {
 }
 
 void crapple_audio_callback(void *userdata, Uint8 *stream, int len) {
-    int16_t *buffer = (int16_t *) stream; // 16-bit signed samples
-    const int samples = len / sizeof(int16_t);
+    int16_t *buffer = (int16_t *) stream;
+    int samples = len / sizeof(int16_t);
 
     for (int i = 0; i < samples; i++) {
-        if (speaker_toggle) {
-            // Square wave: +32767 or -32767 based on state
-            buffer[i] = speaker_state ? 32767 : -32767;
+        if (speaker_toggle && toggle_duration == 0) {
+            toggle_duration = SAMPLE_RATE / 20; // ~50 ms burst (44,100 / 20 = 2205 samples)
+            sample_pos = 0;
+            speaker_toggle = false; // Reset toggle flag immediately
+        }
+        if (toggle_duration > 0) {
+            // Square wave at 2.5 kHz
+            buffer[i] = ((sample_pos / SAMPLES_PER_TOGGLE) % 2) ? 32767 : -32767;
             sample_pos++;
-            if (sample_pos >= SAMPLES_PER_TOGGLE) {
-                speaker_toggle = false; // Stop after half-period
-                sample_pos = 0;
-            }
+            toggle_duration--;
         } else {
             buffer[i] = 0; // Silence
         }
@@ -269,8 +271,16 @@ void crapple_update() {
         }
 
         // CPU update: Run ~17,050 cycles per frame
+        // Also handles timing for audio.
         for (int i = 0; i < 17050; i++) {
             MCS6502Tick(&context);
+
+            cycle_count++;
+            if (speaker_toggle) {
+                speaker_toggle = false;
+                last_toggle_cycle = cycle_count;
+                toggle_duration = SAMPLE_RATE / 20; // ~50 ms
+            }
         }
 
         // Render text page 1
@@ -294,7 +304,7 @@ void crapple_update() {
 }
 
 void crapple_terminate() {
-    SDL_CloseAudio();  // Shut down audio
+    SDL_CloseAudio(); // Shut down audio
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

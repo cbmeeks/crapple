@@ -51,13 +51,17 @@ uint8_t cursor_timer = 0;
 static bool flash_on;
 
 // Audio
+static uint32_t cycle_count = 0;
+static uint32_t last_toggle_cycle = 0;
+#define CYCLES_PER_TOGGLE (511)  // ~2 kHz toggle rate (1 kHz tone)
 bool speaker_state = false; // Tracks speaker position (0 = out, 1 = in)
 bool speaker_toggle = false; // Flag for toggle detection
 SDL_AudioSpec audio_spec;
 static int sample_pos = 0; // Position in audio buffer
 static const int SAMPLE_RATE = 44100;
 static const int TONE_FREQ = 1000; // 1 kHz tone for testing
-static const int SAMPLES_PER_TOGGLE = SAMPLE_RATE / (2 * TONE_FREQ); // Half-period samples
+static const int SAMPLES_PER_TOGGLE = SAMPLE_RATE / (2 * TONE_FREQ);  // ~8 samples per half-cycle
+static int toggle_duration = 0;  // Samples remaining for tone
 int crapple_init_audio();
 void crapple_audio_callback(void *userdata, Uint8 *stream, int len);
 
