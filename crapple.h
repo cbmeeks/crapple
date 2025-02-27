@@ -59,7 +59,7 @@ bool speaker_toggle = false; // Flag for toggle detection
 SDL_AudioSpec audio_spec;
 static int sample_pos = 0; // Position in audio buffer
 static const int SAMPLE_RATE = 44100;
-static const int TONE_FREQ = 1000; // 1 kHz tone for testing
+static const int TONE_FREQ = 910; // ~1 kHz tone for testing (tweak)
 static const int SAMPLES_PER_TOGGLE = SAMPLE_RATE / (2 * TONE_FREQ);  // ~8 samples per half-cycle
 static int toggle_duration = 0;  // Samples remaining for tone
 int crapple_init_audio();

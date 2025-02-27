@@ -43,8 +43,8 @@ int crapple_init() {
     // const int rom = crapple_load_a2_rom();
     // const int rom = crapple_load_a2_plus_rom();
     // const int rom = crapple_load_a2e_rom();
-    const int rom = crapple_load_int_basic_rom();
-    // const int rom = crapple_load_fp_basic_rom();
+    // const int rom = crapple_load_int_basic_rom();
+    const int rom = crapple_load_fp_basic_rom();
     if (rom != 0) {
         fprintf(stderr, "ROM loading failed\n");
         crapple_terminate();
