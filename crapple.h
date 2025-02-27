@@ -5,6 +5,7 @@
 #include "MCS6502.h"
 #include "font.h"
 #include "res/int_basic.h"
+#include "res/fp_basic.h"
 
 #define WIDTH 280
 #define HEIGHT 192
@@ -46,7 +47,7 @@ const uint16_t row_start_addresses[] = {
     0x0428, 0x04A8, 0x0528, 0x05A8, 0x0628, 0x06A8, 0x0728, 0x07A8,
     0X0450, 0x04D0, 0x0550, 0x05D0, 0x0650, 0x06D0, 0x0750, 0x07D0
 };
-
+void crapple_render_text_page_1();
 
 // ROM specific
 int crapple_load_char_rom();
@@ -54,6 +55,7 @@ int crapple_load_a2_rom();
 int crapple_load_a2_plus_rom();
 int crapple_load_a2e_rom();
 int crapple_load_int_basic_rom();
+int crapple_load_fp_basic_rom();
 
 // 6502 Specific Interface to virtual 6502
 MCS6502ExecutionContext context;

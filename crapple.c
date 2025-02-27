@@ -5,8 +5,6 @@
 #include <SDL2/SDL.h>
 #include "MCS6502.c"
 
-void crapple_render_text_page_1();
-
 int crapple_init() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -43,21 +41,15 @@ int crapple_init() {
     // Init CPU
     // Load ROM file
     // const int rom = crapple_load_a2_rom();
-    const int rom = crapple_load_a2_plus_rom();
+    // const int rom = crapple_load_a2_plus_rom();
     // const int rom = crapple_load_a2e_rom();
+    const int rom = crapple_load_int_basic_rom();
+    // const int rom = crapple_load_fp_basic_rom();
     if (rom != 0) {
         fprintf(stderr, "ROM loading failed\n");
         crapple_terminate();
         return 1;
     };
-
-    // Load Integer BASIC at $E000-$FFFF
-    // const int basic_rom = crapple_load_int_basic_rom();
-    // if (crapple_load_int_basic_rom() != 0) {
-    //     fprintf(stderr, "Integer BASIC ROM loading failed\n");
-    //     crapple_terminate();
-    //     return 1;
-    // }
 
     // Load character ROM
     crapple_load_char_rom();
@@ -422,13 +414,24 @@ int crapple_load_a2e_rom() {
 }
 
 int crapple_load_int_basic_rom() {
-    // Load Integer BASIC into $E000-$FFFF
-    size_t rom_size = sizeof(INT_BASIC_ROM) / sizeof(INT_BASIC_ROM[0]);
-    if (rom_size != 8192) {
-        fprintf(stderr, "Integer BASIC ROM size is %zu bytes, expected 8192\n", rom_size);
+    // Load Integer BASIC into $D000-$FFFF
+    uint16_t rom_size = sizeof(INT_BASIC_ROM) / sizeof(INT_BASIC_ROM[0]);
+    if (rom_size != 12288) {
+        fprintf(stderr, "Integer BASIC ROM size is %d bytes, expected 12288\n", rom_size);
         return 1;
     }
-    memcpy(&MEMORY[0xE000], INT_BASIC_ROM, rom_size);
+    memcpy(&MEMORY[0xD000], INT_BASIC_ROM, rom_size);
+    return 0;
+}
+
+int crapple_load_fp_basic_rom() {
+    // Load Floating Point BASIC into $D000-$FFFF
+    uint16_t rom_size = sizeof(FP_BASIC_ROM) / sizeof(FP_BASIC_ROM[0]);
+    if (rom_size != 12288) {
+        fprintf(stderr, "Floating Point BASIC ROM size is %d bytes, expected 12288\n", rom_size);
+        return 1;
+    }
+    memcpy(&MEMORY[0xD000], FP_BASIC_ROM, rom_size);
     return 0;
 }
 
