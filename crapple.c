@@ -51,12 +51,20 @@ int crapple_init() {
         return 1;
     };
 
+    // Load Integer BASIC at $E000-$FFFF
+    // const int basic_rom = crapple_load_int_basic_rom();
+    // if (crapple_load_int_basic_rom() != 0) {
+    //     fprintf(stderr, "Integer BASIC ROM loading failed\n");
+    //     crapple_terminate();
+    //     return 1;
+    // }
+
     // Load character ROM
     crapple_load_char_rom();
 
     MCS6502Init(&context, readBytesFn, writeBytesFn, NULL);
     MCS6502Reset(&context);
-    MCS6502Tick(&context);
+    // MCS6502Tick(&context);
 
     // Halt CPU until Ctrl + Reset  TODO look into this
     // context.pc = 0x0000; // Spin at $0000 (BRK loop) until reset
@@ -97,66 +105,120 @@ void crapple_update() {
                 // Basic ASCII mapping (bit 7 will be set in $C000)
                 switch (key) {
                     // Letters (uppercase, flashing)
-                    case SDLK_a: apple_key = 0x41; break;
-                    case SDLK_b: apple_key = 0x42; break;
-                    case SDLK_c: apple_key = 0x43; break;
-                    case SDLK_d: apple_key = 0x44; break;
-                    case SDLK_e: apple_key = 0x45; break;
-                    case SDLK_f: apple_key = 0x46; break;
-                    case SDLK_g: apple_key = 0x47; break;
-                    case SDLK_h: apple_key = 0x48; break;
-                    case SDLK_i: apple_key = 0x49; break;
-                    case SDLK_j: apple_key = 0x4A; break;
-                    case SDLK_k: apple_key = 0x4B; break;
-                    case SDLK_l: apple_key = 0x4C; break;
-                    case SDLK_m: apple_key = 0x4D; break;
-                    case SDLK_n: apple_key = 0x4E; break;
-                    case SDLK_o: apple_key = 0x4F; break;
-                    case SDLK_p: apple_key = 0x50; break;
-                    case SDLK_q: apple_key = 0x51; break;
-                    case SDLK_r: apple_key = 0x52; break;
-                    case SDLK_s: apple_key = 0x53; break;
-                    case SDLK_t: apple_key = 0x54; break;
-                    case SDLK_u: apple_key = 0x55; break;
-                    case SDLK_v: apple_key = 0x56; break;
-                    case SDLK_w: apple_key = 0x57; break;
-                    case SDLK_x: apple_key = 0x58; break;
-                    case SDLK_y: apple_key = 0x59; break;
-                    case SDLK_z: apple_key = 0x5A; break;
+                    case SDLK_a: apple_key = 0x41;
+                        break;
+                    case SDLK_b: apple_key = 0x42;
+                        break;
+                    case SDLK_c: apple_key = 0x43;
+                        break;
+                    case SDLK_d: apple_key = 0x44;
+                        break;
+                    case SDLK_e: apple_key = 0x45;
+                        break;
+                    case SDLK_f: apple_key = 0x46;
+                        break;
+                    case SDLK_g: apple_key = 0x47;
+                        break;
+                    case SDLK_h: apple_key = 0x48;
+                        break;
+                    case SDLK_i: apple_key = 0x49;
+                        break;
+                    case SDLK_j: apple_key = 0x4A;
+                        break;
+                    case SDLK_k: apple_key = 0x4B;
+                        break;
+                    case SDLK_l: apple_key = 0x4C;
+                        break;
+                    case SDLK_m: apple_key = 0x4D;
+                        break;
+                    case SDLK_n: apple_key = 0x4E;
+                        break;
+                    case SDLK_o: apple_key = 0x4F;
+                        break;
+                    case SDLK_p: apple_key = 0x50;
+                        break;
+                    case SDLK_q: apple_key = 0x51;
+                        break;
+                    case SDLK_r: apple_key = 0x52;
+                        break;
+                    case SDLK_s: apple_key = 0x53;
+                        break;
+                    case SDLK_t: apple_key = 0x54;
+                        break;
+                    case SDLK_u: apple_key = 0x55;
+                        break;
+                    case SDLK_v: apple_key = 0x56;
+                        break;
+                    case SDLK_w: apple_key = 0x57;
+                        break;
+                    case SDLK_x: apple_key = 0x58;
+                        break;
+                    case SDLK_y: apple_key = 0x59;
+                        break;
+                    case SDLK_z: apple_key = 0x5A;
+                        break;
 
                     // Numbers and shifted symbols (flashing unless specified)
-                    case SDLK_0: apple_key = (mod & KMOD_SHIFT) ? 0x29 : 0x30; break; // ')' or '0'
-                    case SDLK_1: apple_key = (mod & KMOD_SHIFT) ? 0x21 : 0x31; break; // '!' or '1'
-                    case SDLK_2: apple_key = (mod & KMOD_SHIFT) ? 0x40 : 0x32; break; // '@' or '2'
-                    case SDLK_3: apple_key = (mod & KMOD_SHIFT) ? 0x23 : 0x33; break; // '#' or '3'
-                    case SDLK_4: apple_key = (mod & KMOD_SHIFT) ? 0x24 : 0x34; break; // '$' or '4'
-                    case SDLK_5: apple_key = (mod & KMOD_SHIFT) ? 0x25 : 0x35; break; // '%' or '5'
-                    case SDLK_6: apple_key = (mod & KMOD_SHIFT) ? 0x5E : 0x36; break; // '^' or '6'
-                    case SDLK_7: apple_key = (mod & KMOD_SHIFT) ? 0x26 : 0x37; break; // '&' or '7'
-                    case SDLK_8: apple_key = (mod & KMOD_SHIFT) ? 0x2A : 0x38; break; // '*' or '8'
-                    case SDLK_9: apple_key = (mod & KMOD_SHIFT) ? 0x28 : 0x39; break; // '(' or '9'
+                    case SDLK_0: apple_key = (mod & KMOD_SHIFT) ? 0x29 : 0x30;
+                        break; // ')' or '0'
+                    case SDLK_1: apple_key = (mod & KMOD_SHIFT) ? 0x21 : 0x31;
+                        break; // '!' or '1'
+                    case SDLK_2: apple_key = (mod & KMOD_SHIFT) ? 0x40 : 0x32;
+                        break; // '@' or '2'
+                    case SDLK_3: apple_key = (mod & KMOD_SHIFT) ? 0x23 : 0x33;
+                        break; // '#' or '3'
+                    case SDLK_4: apple_key = (mod & KMOD_SHIFT) ? 0x24 : 0x34;
+                        break; // '$' or '4'
+                    case SDLK_5: apple_key = (mod & KMOD_SHIFT) ? 0x25 : 0x35;
+                        break; // '%' or '5'
+                    case SDLK_6: apple_key = (mod & KMOD_SHIFT) ? 0x5E : 0x36;
+                        break; // '^' or '6'
+                    case SDLK_7: apple_key = (mod & KMOD_SHIFT) ? 0x26 : 0x37;
+                        break; // '&' or '7'
+                    case SDLK_8: apple_key = (mod & KMOD_SHIFT) ? 0x2A : 0x38;
+                        break; // '*' or '8'
+                    case SDLK_9: apple_key = (mod & KMOD_SHIFT) ? 0x28 : 0x39;
+                        break; // '(' or '9'
 
                     // Symbols (normal mode with Shift)
-                    case SDLK_MINUS: apple_key = (mod & KMOD_SHIFT) ? 0x5F : 0x2D; break; // '_' or '-'
-                    case SDLK_EQUALS: apple_key = (mod & KMOD_SHIFT) ? 0x2B : 0x3D; break; // '+' or '='
-                    case SDLK_LEFTBRACKET: apple_key = 0x5B; break; // '['
-                    case SDLK_RIGHTBRACKET: apple_key = 0x5D; break; // ']'
-                    case SDLK_BACKSLASH: apple_key = 0x5C; break; // '\'
-                    case SDLK_SEMICOLON: apple_key = 0x3B; break; // ';'
-                    case SDLK_COLON: apple_key = (mod & KMOD_SHIFT) ? 0x2A : 0x3A; break; // '*' or ':'
-                    case SDLK_QUOTE: apple_key = (mod & KMOD_SHIFT) ? 0x22 : 0x27; break; // '"' or "'"
-                    case SDLK_COMMA: apple_key = 0x2C; break; // ','
-                    case SDLK_PERIOD: apple_key = 0x2E; break; // '.'
-                    case SDLK_SLASH: apple_key = (mod & KMOD_SHIFT) ? 0x3F : 0x2F; break; // '?' or '/'
+                    case SDLK_MINUS: apple_key = (mod & KMOD_SHIFT) ? 0x5F : 0x2D;
+                        break; // '_' or '-'
+                    case SDLK_EQUALS: apple_key = (mod & KMOD_SHIFT) ? 0x2B : 0x3D;
+                        break; // '+' or '='
+                    case SDLK_LEFTBRACKET: apple_key = 0x5B;
+                        break; // '['
+                    case SDLK_RIGHTBRACKET: apple_key = 0x5D;
+                        break; // ']'
+                    case SDLK_BACKSLASH: apple_key = 0x5C;
+                        break; // '\'
+                    case SDLK_SEMICOLON: apple_key = 0x3B;
+                        break; // ';'
+                    case SDLK_COLON: apple_key = (mod & KMOD_SHIFT) ? 0x2A : 0x3A;
+                        break; // '*' or ':'
+                    case SDLK_QUOTE: apple_key = (mod & KMOD_SHIFT) ? 0x22 : 0x27;
+                        break; // '"' or "'"
+                    case SDLK_COMMA: apple_key = 0x2C;
+                        break; // ','
+                    case SDLK_PERIOD: apple_key = 0x2E;
+                        break; // '.'
+                    case SDLK_SLASH: apple_key = (mod & KMOD_SHIFT) ? 0x3F : 0x2F;
+                        break; // '?' or '/'
 
                     // Special keys
-                    case SDLK_SPACE: apple_key = 0x20; break;     // Space
-                    case SDLK_RETURN: apple_key = 0x0D; break;    // Carriage Return
-                    case SDLK_BACKSPACE: apple_key = 0x08; break; // Backspace
-                    case SDLK_LEFT: apple_key = 0x08; break;      // Left arrow (BS)
-                    case SDLK_RIGHT: apple_key = 0x15; break;     // Right arrow (Ctrl+U)
-                    case SDLK_TAB: apple_key = 0x09; break;       // Tab
-                    case SDLK_ESCAPE: apple_key = 0x1B; break;    // Escape
+                    case SDLK_SPACE: apple_key = 0x20;
+                        break; // Space
+                    case SDLK_RETURN: apple_key = 0x0D;
+                        break; // Carriage Return
+                    case SDLK_BACKSPACE: apple_key = 0x08;
+                        break; // Backspace
+                    case SDLK_LEFT: apple_key = 0x08;
+                        break; // Left arrow (BS)
+                    case SDLK_RIGHT: apple_key = 0x15;
+                        break; // Right arrow (Ctrl+U)
+                    case SDLK_TAB: apple_key = 0x09;
+                        break; // Tab
+                    case SDLK_ESCAPE: apple_key = 0x1B;
+                        break; // Escape
 
                     default: break;
                 }
@@ -182,13 +244,7 @@ void crapple_update() {
         crapple_render_text_page_1();
 
         // Flash cursor
-        cursor_timer++;
-        if (cursor_timer >= 30) {
-            // ~0.5s at 60 FPS
-            uint8_t pos = MEMORY[0x0401];
-            MEMORY[0x0401] = (pos == 0x5F) ? 0xA0 : 0x5F; // Toggle _ and space
-            cursor_timer = 0;
-        }
+        // crapple_handle_cursor();
 
         SDL_UpdateTexture(texture, NULL, pixels, WIDTH * sizeof(uint32_t));
         SDL_RenderClear(renderer);
@@ -235,12 +291,6 @@ void crapple_terminate() {
         ...
  */
 void crapple_render_text_page_1() {
-    const uint16_t row_start_addresses[] = {
-        0x0400, 0x0480, 0x0500, 0x0580, 0x0600, 0x0680, 0x0700, 0x0780,
-        0x0428, 0x04A8, 0x0528, 0x05A8, 0x0628, 0x06A8, 0x0728, 0x07A8,
-        0X0450, 0x04D0, 0x0550, 0x05D0, 0x0650, 0x06D0, 0x0750, 0x07D0
-    };
-
     for (int row = 0; row < 24; row++) {
         for (int col = 0; col < 40; col++) {
             uint8_t chr = MEMORY[row_start_addresses[row] + col]; // 0x00-0xFF directly
@@ -368,6 +418,17 @@ int crapple_load_a2e_rom() {
     }
     fclose(rom);
 
+    return 0;
+}
+
+int crapple_load_int_basic_rom() {
+    // Load Integer BASIC into $E000-$FFFF
+    size_t rom_size = sizeof(INT_BASIC_ROM) / sizeof(INT_BASIC_ROM[0]);
+    if (rom_size != 8192) {
+        fprintf(stderr, "Integer BASIC ROM size is %zu bytes, expected 8192\n", rom_size);
+        return 1;
+    }
+    memcpy(&MEMORY[0xE000], INT_BASIC_ROM, rom_size);
     return 0;
 }
 

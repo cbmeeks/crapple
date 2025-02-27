@@ -4,6 +4,7 @@
 #include "cpu.h"
 #include "MCS6502.h"
 #include "font.h"
+#include "res/int_basic.h"
 
 #define WIDTH 280
 #define HEIGHT 192
@@ -37,18 +38,27 @@ int crapple_init();
 void crapple_update();
 void crapple_terminate();
 uint16_t getTextAddress(const uint8_t col, const uint8_t row);
-void crapple_clear_text_page_1();
 void crapple_test();
 
+// Display
+const uint16_t row_start_addresses[] = {
+    0x0400, 0x0480, 0x0500, 0x0580, 0x0600, 0x0680, 0x0700, 0x0780,
+    0x0428, 0x04A8, 0x0528, 0x05A8, 0x0628, 0x06A8, 0x0728, 0x07A8,
+    0X0450, 0x04D0, 0x0550, 0x05D0, 0x0650, 0x06D0, 0x0750, 0x07D0
+};
+
+
+// ROM specific
 int crapple_load_char_rom();
 int crapple_load_a2_rom();
 int crapple_load_a2_plus_rom();
 int crapple_load_a2e_rom();
+int crapple_load_int_basic_rom();
 
 // 6502 Specific Interface to virtual 6502
 MCS6502ExecutionContext context;
-uint8_t readBytesFn(uint16_t address, void *context);
-void writeBytesFn(uint16_t address, uint8_t value, void *context);
+uint8_t readBytesFn(uint16_t addr, void *context);
+void writeBytesFn(uint16_t addr, uint8_t value, void *context);
 
 
 static uint8_t keyboard_data = 0x00; // Last key pressed
@@ -75,21 +85,11 @@ inline void writeBytesFn(uint16_t addr, uint8_t value, void* context) {
     }
 }
 
-// Function to simulate a key press
+// Function to simulate a key presses
 void simulate_key_press(uint8_t key);
 inline void simulate_key_press(uint8_t key) {
     keyboard_data = key & 0x7F; // Store ASCII (no bit 7)
     key_available = true;       // Set key ready
 }
 
-// inline uint8_t readBytesFn(uint16_t address, void *context) {
-//     return MEMORY[address];
-// }
-//
-// inline void writeBytesFn(uint16_t address, uint8_t value, void *context) {
-//     if (address >= 0x0400 && address < 0x07FF) {
-//         // printf("%04X %02X\n", address, value);
-//     }
-//     MEMORY[address] = value;
-// }
 
