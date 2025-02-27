@@ -58,6 +58,10 @@ int crapple_init() {
     MCS6502Reset(&context);
     MCS6502Tick(&context);
 
+    // Halt CPU until Ctrl + Reset  TODO look into this
+    // context.pc = 0x0000; // Spin at $0000 (BRK loop) until reset
+    // printf("Waiting for Ctrl + Reset...\n");
+
     return 0;
 }
 
@@ -65,12 +69,108 @@ void crapple_update() {
     const Uint32 frameTime = 1000 / 60; // 16.67 ms
     Uint32 nextTime = SDL_GetTicks();
 
-    printf("Starting emulation...\n");
+    printf("CRAPPLE emulator starting...\n");
+
+    static bool reset_triggered = false;
 
     while (crapple_running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) crapple_running = false;
+            if (event.type == SDL_QUIT) {
+                crapple_running = false;
+            } else if (event.type == SDL_KEYDOWN) {
+                SDL_Keycode key = event.key.keysym.sym;
+                Uint16 mod = event.key.keysym.mod; // Get modifier state
+                uint8_t apple_key = 0x00;
+
+                // Handle Ctrl + Reset
+                if (mod & KMOD_CTRL && key == SDLK_r) {
+                    simulate_key_press(0x12); // Ctrl+R
+                    // context.pc = 0xFF59;      // Jump to warm start
+                    reset_triggered = true;
+                    continue;
+                }
+
+                // Process keys only after reset
+                // if (!reset_triggered) continue;
+
+                // Basic ASCII mapping (bit 7 will be set in $C000)
+                switch (key) {
+                    // Letters (uppercase, flashing)
+                    case SDLK_a: apple_key = 0x41; break;
+                    case SDLK_b: apple_key = 0x42; break;
+                    case SDLK_c: apple_key = 0x43; break;
+                    case SDLK_d: apple_key = 0x44; break;
+                    case SDLK_e: apple_key = 0x45; break;
+                    case SDLK_f: apple_key = 0x46; break;
+                    case SDLK_g: apple_key = 0x47; break;
+                    case SDLK_h: apple_key = 0x48; break;
+                    case SDLK_i: apple_key = 0x49; break;
+                    case SDLK_j: apple_key = 0x4A; break;
+                    case SDLK_k: apple_key = 0x4B; break;
+                    case SDLK_l: apple_key = 0x4C; break;
+                    case SDLK_m: apple_key = 0x4D; break;
+                    case SDLK_n: apple_key = 0x4E; break;
+                    case SDLK_o: apple_key = 0x4F; break;
+                    case SDLK_p: apple_key = 0x50; break;
+                    case SDLK_q: apple_key = 0x51; break;
+                    case SDLK_r: apple_key = 0x52; break;
+                    case SDLK_s: apple_key = 0x53; break;
+                    case SDLK_t: apple_key = 0x54; break;
+                    case SDLK_u: apple_key = 0x55; break;
+                    case SDLK_v: apple_key = 0x56; break;
+                    case SDLK_w: apple_key = 0x57; break;
+                    case SDLK_x: apple_key = 0x58; break;
+                    case SDLK_y: apple_key = 0x59; break;
+                    case SDLK_z: apple_key = 0x5A; break;
+
+                    // Numbers and shifted symbols (flashing unless specified)
+                    case SDLK_0: apple_key = (mod & KMOD_SHIFT) ? 0x29 : 0x30; break; // ')' or '0'
+                    case SDLK_1: apple_key = (mod & KMOD_SHIFT) ? 0x21 : 0x31; break; // '!' or '1'
+                    case SDLK_2: apple_key = (mod & KMOD_SHIFT) ? 0x40 : 0x32; break; // '@' or '2'
+                    case SDLK_3: apple_key = (mod & KMOD_SHIFT) ? 0x23 : 0x33; break; // '#' or '3'
+                    case SDLK_4: apple_key = (mod & KMOD_SHIFT) ? 0x24 : 0x34; break; // '$' or '4'
+                    case SDLK_5: apple_key = (mod & KMOD_SHIFT) ? 0x25 : 0x35; break; // '%' or '5'
+                    case SDLK_6: apple_key = (mod & KMOD_SHIFT) ? 0x5E : 0x36; break; // '^' or '6'
+                    case SDLK_7: apple_key = (mod & KMOD_SHIFT) ? 0x26 : 0x37; break; // '&' or '7'
+                    case SDLK_8: apple_key = (mod & KMOD_SHIFT) ? 0x2A : 0x38; break; // '*' or '8'
+                    case SDLK_9: apple_key = (mod & KMOD_SHIFT) ? 0x28 : 0x39; break; // '(' or '9'
+
+                    // Symbols (normal mode with Shift)
+                    case SDLK_MINUS: apple_key = (mod & KMOD_SHIFT) ? 0x5F : 0x2D; break; // '_' or '-'
+                    case SDLK_EQUALS: apple_key = (mod & KMOD_SHIFT) ? 0x2B : 0x3D; break; // '+' or '='
+                    case SDLK_LEFTBRACKET: apple_key = 0x5B; break; // '['
+                    case SDLK_RIGHTBRACKET: apple_key = 0x5D; break; // ']'
+                    case SDLK_BACKSLASH: apple_key = 0x5C; break; // '\'
+                    case SDLK_SEMICOLON: apple_key = 0x3B; break; // ';'
+                    case SDLK_COLON: apple_key = (mod & KMOD_SHIFT) ? 0x2A : 0x3A; break; // '*' or ':'
+                    case SDLK_QUOTE: apple_key = (mod & KMOD_SHIFT) ? 0x22 : 0x27; break; // '"' or "'"
+                    case SDLK_COMMA: apple_key = 0x2C; break; // ','
+                    case SDLK_PERIOD: apple_key = 0x2E; break; // '.'
+                    case SDLK_SLASH: apple_key = (mod & KMOD_SHIFT) ? 0x3F : 0x2F; break; // '?' or '/'
+
+                    // Special keys
+                    case SDLK_SPACE: apple_key = 0x20; break;     // Space
+                    case SDLK_RETURN: apple_key = 0x0D; break;    // Carriage Return
+                    case SDLK_BACKSPACE: apple_key = 0x08; break; // Backspace
+                    case SDLK_LEFT: apple_key = 0x08; break;      // Left arrow (BS)
+                    case SDLK_RIGHT: apple_key = 0x15; break;     // Right arrow (Ctrl+U)
+                    case SDLK_TAB: apple_key = 0x09; break;       // Tab
+                    case SDLK_ESCAPE: apple_key = 0x1B; break;    // Escape
+
+                    default: break;
+                }
+
+                // Ctrl modifier for control codes (overrides Shift)
+                if (mod & KMOD_CTRL && apple_key >= 0x40 && apple_key <= 0x5F) {
+                    apple_key &= 0x1F; // Ctrl+A = 0x01, Ctrl+B = 0x02, etc.
+                }
+
+                if (apple_key != 0x00) {
+                    simulate_key_press(apple_key);
+                    printf("Key pressed: %c (0x%02X)\n", apple_key < 0x20 ? '.' : apple_key, apple_key);
+                }
+            }
         }
 
         // CPU update: Run ~17,050 cycles per frame
@@ -80,6 +180,15 @@ void crapple_update() {
 
         // Render text page 1
         crapple_render_text_page_1();
+
+        // Flash cursor
+        cursor_timer++;
+        if (cursor_timer >= 30) {
+            // ~0.5s at 60 FPS
+            uint8_t pos = MEMORY[0x0401];
+            MEMORY[0x0401] = (pos == 0x5F) ? 0xA0 : 0x5F; // Toggle _ and space
+            cursor_timer = 0;
+        }
 
         SDL_UpdateTexture(texture, NULL, pixels, WIDTH * sizeof(uint32_t));
         SDL_RenderClear(renderer);
@@ -99,13 +208,6 @@ void crapple_terminate() {
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
-}
-
-void crapple_clear_text_page_1() {
-    // for (int i = 0x0400; i < 0x07F8; i++) {
-    // MEMORY[i] = 0x20; // ' '
-    // }
-    // MEMORY[0x07D0] = 0x5D;
 }
 
 /**
@@ -141,13 +243,9 @@ void crapple_render_text_page_1() {
 
     for (int row = 0; row < 24; row++) {
         for (int col = 0; col < 40; col++) {
-            uint8_t chr = MEMORY[row_start_addresses[row] + col];
-            if (chr < 0x40) chr += 0x40; // Inverse
-            else if (chr < 0x80) chr &= 0x3F; // Flashing
-            else chr -= 0x80; // Normal
-
+            uint8_t chr = MEMORY[row_start_addresses[row] + col]; // 0x00-0xFF directly
             for (int y = 0; y < 8; y++) {
-                uint8_t glyphRow = FONT[chr & 0x7F][y]; // Use FONT array
+                uint8_t glyphRow = FONT[chr][y]; // Use full 256-char index
                 for (int x = 0; x < 7; x++) {
                     int px = col * 7 + x; // Native 280x192
                     int py = row * 8 + y;
@@ -166,9 +264,20 @@ int crapple_load_char_rom() {
         crapple_terminate();
         return 1;
     }
-    size_t bytesRead = fread(FONT, 1, 128 * 8, fontFile);
-    if (bytesRead != 128 * 8) {
-        fprintf(stderr, "Font read failed: %zu of 1024 bytes\n", bytesRead);
+
+    fseek(fontFile, 0, SEEK_END);
+    size_t fileSize = ftell(fontFile);
+    if (fileSize < 2048) {
+        fprintf(stderr, "Font file too small: %zu bytes, expected 2048\n", fileSize);
+        fclose(fontFile);
+        crapple_terminate();
+        return 1;
+    }
+
+    fseek(fontFile, 0, SEEK_SET);
+    size_t bytesRead = fread(FONT, 1, 256 * 8, fontFile); // 256 chars × 8 bytes = 2048 bytes
+    if (bytesRead != 256 * 8) {
+        fprintf(stderr, "Font read failed: %zu of 2048 bytes\n", bytesRead);
         fclose(fontFile);
         crapple_terminate();
         return 1;
