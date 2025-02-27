@@ -3,7 +3,7 @@
 #include<stdbool.h>
 #include<stdint.h>
 
-uint8_t MEMORY[0x10000]; //  64KiB Memory
+uint8_t CPU_MEMORY[0x10000]; //  64KiB Memory
 uint8_t STATUS = 0;
 uint16_t PC = 0x0000; // TODO start from reset vector
 uint8_t ACCUM = 0;
@@ -78,7 +78,7 @@ typedef struct _Instruction {
  * Array of instructions (struct)
  */
 Instruction Instructions[] = {
-    {0x69, "ADC", AddressingImmediate, 2, false},
+    {0x69, "ADC", AddressingImmediate, 2, false},   // Y
     {0x65, "ADC", AddressingZeroPage, 3, false},
     {0x75, "ADC", AddressingZeroPageX, 4, false},
     {0x6D, "ADC", AddressingAbsolute, 4, false},
@@ -239,7 +239,7 @@ typedef struct _ExecutionContext {
     uint8_t A; // Accumulator
     uint8_t X; // X register
     uint8_t Y; // Y register
-    uint8_t P; // Processor status
+    uint8_t STATUS; // Processor status
     uint16_t SP; // Stack pointer
     uint16_t PC; // Program counter
     uint16_t pendingTiming; // ticks to run down between each instruction
@@ -273,7 +273,7 @@ void cpu_exec_adc_bcd(ExecutionContext *context, uint8_t operand);
 
 // Inline functions
 inline uint8_t fetchOpcode(const uint16_t address) {
-    return MEMORY[address];
+    return CPU_MEMORY[address];
 };
 
 inline Instruction *fetchInstruction(const uint8_t opcode) {

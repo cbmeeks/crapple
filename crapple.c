@@ -3,12 +3,7 @@
 #include "crapple.h"
 #include <errno.h>
 #include <SDL2/SDL.h>
-#include "cpu.c"
-/**
-
-    ROMS:
-    https://github.com/AppleWin/AppleWin/tree/master/resource
-*/
+#include "MCS6502.c"
 
 void crapple_render_text_page_1();
 
@@ -46,29 +41,22 @@ int crapple_init() {
     }
 
     // Init CPU
-    cpu_init(&context);
-    reset(&context);
-    crapple_clear_text_page_1();
-
-    // Load 2 KiB font file
-    if (crapple_loadFont("../res/Apple2_Video.rom") != 0) {
-        fprintf(stderr, "Font loading failed\n");
+    // Load ROM file
+    // const int rom = crapple_load_a2_rom();
+    const int rom = crapple_load_a2_plus_rom();
+    // const int rom = crapple_load_a2e_rom();
+    if (rom != 0) {
+        fprintf(stderr, "ROM loading failed\n");
         crapple_terminate();
         return 1;
-    }
+    };
 
-    // Rows 0–7: $0400–$047F (128 bytes).
-    // Rows 8–15: $0480–$04FF (128 bytes).
-    // Rows 16–23: $0500–$057F (128 bytes).
-    // MEMORY[0x0400] = 0xCE;
-    // MEMORY[0x0480] = 0xCE;
-    // MEMORY[0x0500] = 0xCE;
+    // Load character ROM
+    crapple_load_char_rom();
 
-    // for (int i = 0; i < 960; i++) {
-    //     // 40x24 = 960 chars
-    //     // MEMORY[0x0400 + i] = 0xC1 + (i % 26); // A-Z repeating
-    //     MEMORY[0x0400 + i] = i; // A-Z repeating
-    // }
+    MCS6502Init(&context, readBytesFn, writeBytesFn, NULL);
+    MCS6502Reset(&context);
+    MCS6502Tick(&context);
 
     return 0;
 }
@@ -76,6 +64,8 @@ int crapple_init() {
 void crapple_update() {
     const Uint32 frameTime = 1000 / 60; // 16.67 ms
     Uint32 nextTime = SDL_GetTicks();
+
+    printf("Starting emulation...\n");
 
     while (crapple_running) {
         SDL_Event event;
@@ -85,11 +75,10 @@ void crapple_update() {
 
         // CPU update: Run ~17,050 cycles per frame
         for (int i = 0; i < 17050; i++) {
-            tick(&context);
-            // printStatus();
+            MCS6502Tick(&context);
         }
 
-        // Update text page to pixels
+        // Render text page 1
         crapple_render_text_page_1();
 
         SDL_UpdateTexture(texture, NULL, pixels, WIDTH * sizeof(uint32_t));
@@ -113,10 +102,10 @@ void crapple_terminate() {
 }
 
 void crapple_clear_text_page_1() {
-    for (int i = 0x0400; i < 0x07F8; i++) {
-        MEMORY[i] = 0x20; // ' '
-    }
-    MEMORY[0x07D0] = 0x5D;
+    // for (int i = 0x0400; i < 0x07F8; i++) {
+    // MEMORY[i] = 0x20; // ' '
+    // }
+    // MEMORY[0x07D0] = 0x5D;
 }
 
 /**
@@ -149,12 +138,16 @@ void crapple_render_text_page_1() {
         0x0428, 0x04A8, 0x0528, 0x05A8, 0x0628, 0x06A8, 0x0728, 0x07A8,
         0X0450, 0x04D0, 0x0550, 0x05D0, 0x0650, 0x06D0, 0x0750, 0x07D0
     };
+
     for (int row = 0; row < 24; row++) {
         for (int col = 0; col < 40; col++) {
             uint8_t chr = MEMORY[row_start_addresses[row] + col];
-            if (chr >= 0x80) chr &= 0x7F; // Normal + inverse/flashing
+            if (chr < 0x40) chr += 0x40; // Inverse
+            else if (chr < 0x80) chr &= 0x3F; // Flashing
+            else chr -= 0x80; // Normal
+
             for (int y = 0; y < 8; y++) {
-                const uint8_t glyphRow = font[chr & 0x7F][y]; // Mask to 0x00-0x7F
+                uint8_t glyphRow = FONT[chr & 0x7F][y]; // Use FONT array
                 for (int x = 0; x < 7; x++) {
                     int px = col * 7 + x; // Native 280x192
                     int py = row * 8 + y;
@@ -165,46 +158,136 @@ void crapple_render_text_page_1() {
     }
 }
 
-int crapple_loadFont(const char *filename) {
-    FILE *file = fopen(filename, "rb");
-    if (!file) {
-        fprintf(stderr, "Failed to open font file %s: %s\n", filename, strerror(errno));
+int crapple_load_char_rom() {
+    // Load font into FONT array
+    FILE *fontFile = fopen("/data/gdrive/Projects/Apple/crapple/res/Apple2_Video.rom", "rb");
+    if (!fontFile) {
+        fprintf(stderr, "Font file open failed: %s\n", strerror(errno));
+        crapple_terminate();
         return 1;
     }
-
-    // Read first 1024 bytes (ignore repeat)
-    size_t bytesRead = fread(font, 1, 128 * 8, file);
+    size_t bytesRead = fread(FONT, 1, 128 * 8, fontFile);
     if (bytesRead != 128 * 8) {
-        fprintf(stderr, "Font file %s incomplete: read %zu of 1024 bytes\n", filename, bytesRead);
-        fclose(file);
+        fprintf(stderr, "Font read failed: %zu of 1024 bytes\n", bytesRead);
+        fclose(fontFile);
+        crapple_terminate();
+        return 1;
+    }
+    fclose(fontFile);
+
+    return 0;
+}
+
+int crapple_load_a2_rom() {
+    FILE *rom = fopen("/data/gdrive/Projects/Apple/crapple/res/Apple2.rom", "rb");
+    if (!rom) {
+        fprintf(stderr, "Failed to open ROM file: %s\n", strerror(errno));
         return 1;
     }
 
-    fclose(file);
+    // copy ROM into 0xD000
+    fseek(rom, 0, SEEK_END);
+    size_t size = ftell(rom);
+    if (size != 12288) {
+        // 12 KiB
+        fprintf(stderr, "ROM file size is %zu bytes, expected 12288\n", size);
+        fclose(rom);
+        return 1;
+    }
+    fseek(rom, 0, SEEK_SET);
+    size_t bytesRead = fread(&MEMORY[0xD000], 1, 12288, rom);
+    if (bytesRead != 12288) {
+        fprintf(stderr, "ROM read failed: %zu of 12288 bytes\n", bytesRead);
+        fclose(rom);
+        return 1;
+    }
+    fclose(rom);
+
+    return 0;
+}
+
+int crapple_load_a2_plus_rom() {
+    FILE *rom = fopen("/data/gdrive/Projects/Apple/crapple/res/Apple2_Plus.rom", "rb");
+    if (!rom) {
+        fprintf(stderr, "Failed to open ROM file: %s\n", strerror(errno));
+        return 1;
+    }
+
+    // copy ROM into 0xD000
+    fseek(rom, 0, SEEK_END);
+    size_t size = ftell(rom);
+    if (size != 12288) {
+        // 12 KiB
+        fprintf(stderr, "ROM file size is %zu bytes, expected 12288\n", size);
+        fclose(rom);
+        return 1;
+    }
+    fseek(rom, 0, SEEK_SET);
+    size_t bytesRead = fread(&MEMORY[0xD000], 1, 12288, rom);
+    if (bytesRead != 12288) {
+        fprintf(stderr, "ROM read failed: %zu of 12288 bytes\n", bytesRead);
+        fclose(rom);
+        return 1;
+    }
+    fclose(rom);
+
+    return 0;
+}
+
+int crapple_load_a2e_rom() {
+    FILE *rom = fopen("/data/gdrive/Projects/Apple/crapple/res/Apple2e.rom", "rb");
+    if (!rom) {
+        fprintf(stderr, "Failed to open ROM file: %s\n", strerror(errno));
+        return 1;
+    }
+
+    // copy ROM into 0xC000
+    fseek(rom, 0, SEEK_END);
+    size_t size = ftell(rom);
+    if (size != 16384) {
+        // 16 KiB
+        fprintf(stderr, "ROM file size is %zu bytes, expected 16384\n", size);
+        fclose(rom);
+        return 1;
+    }
+    fseek(rom, 0, SEEK_SET);
+    size_t bytesRead = fread(&MEMORY[0xD000], 1, 16384, rom);
+    if (bytesRead != 16384) {
+        fprintf(stderr, "ROM read failed: %zu of 16384 bytes\n", bytesRead);
+        fclose(rom);
+        return 1;
+    }
+    fclose(rom);
+
     return 0;
 }
 
 void crapple_test() {
     // just for testing stuff
 
-    // Testing ADC
-    //  ADC #10
-    //  JMP $0000
-    cpu_poke(0x0000, 0x69); // ADC #$10
-    cpu_poke(0x0001, 0x10); // #$10 (operand)
-    cpu_poke(0x0002, 0x4C); // JMP (absolute)
-    cpu_poke(0x0003, 0x00); // $00
-    cpu_poke(0x0004, 0x00); // $20
+    // Testing text page 1
+    // ee 00 04 4c 00 06
+    // MEMORY[0xFFFC] = 0x00;      // reset vector (0x0600)
+    // MEMORY[0xFFFD] = 0x06;
+    // MEMORY[0x0600] = 0xEE;
+    // MEMORY[0x0601] = 0x00;
+    // MEMORY[0x0602] = 0x04;
+    // MEMORY[0x0603] = 0x4C;
+    // MEMORY[0x0604] = 0x00;
+    // MEMORY[0x0605] = 0x06;
 
-    // Testing JMP
-    // Let's start with JMP $2000
-    // cpu_poke(0x0000, 0x4C);     // JMP (absolute)
-    // cpu_poke(0x0001, 0x00);     // $00
-    // cpu_poke(0x0002, 0x20);     // $20
+    // Insert test program at $F000
+    // uint8_t program[] = {
+    //     0xA9, 0xC8, 0x8D, 0x00, 0x04, // LDA #$C8, STA $0400
+    //     0xA9, 0xC5, 0x8D, 0x01, 0x04, // LDA #$C5, STA $0401
+    //     0xA9, 0xCC, 0x8D, 0x02, 0x04, // LDA #$CC, STA $0402
+    //     0x8D, 0x03, 0x04,             // STA $0403
+    //     0xA9, 0xCF, 0x8D, 0x04, 0x04, // LDA #$CF, STA $0404
+    //     0x4C, 0x17, 0xF0              // JMP $F017
+    // };
+    // memcpy(&MEMORY[0xF000], program, sizeof(program));
     //
-    // // Now put an INX in $2000 and jump to it forever
-    // cpu_poke(0x2000, 0xE8);     // INX
-    // cpu_poke(0x2001, 0x4C);     // JMP (absolute)
-    // cpu_poke(0x2002, 0x00);     // $00
-    // cpu_poke(0x2003, 0x20);     // $20
+    // // Set reset vector to $F000
+    // MEMORY[0xFFFC] = 0x00; // Low byte
+    // MEMORY[0xFFFD] = 0xF0; // High byte
 }

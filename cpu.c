@@ -17,16 +17,16 @@ void cpu_init(ExecutionContext *context) {
 
     // clear memory bank to default value
     for (int i = 0; i < 0xFFFF; i++) {
-        MEMORY[i] = 0xEA; // NOP
+        CPU_MEMORY[i] = 0xEA; // NOP
     }
 
     // The decimal mode is arbitrary at power on.
     // At the moment, let's assume we're starting with decimal mode off
-    setDecimalFlag(false); // TODO change this.  Research if this is default
+    setDecimalFlag(false);
 }
 
 void cpu_poke(uint16_t address, uint8_t value) {
-    MEMORY[address] = value;
+    CPU_MEMORY[address] = value;
 }
 
 // 6502 Functions
@@ -42,6 +42,9 @@ void reset(ExecutionContext *context) {
     context->A = ACCUM;
     context->X = XREG;
     context->Y = YREG;
+    context->STATUS = 0x04; // I=1 (IRQ disabled), others 0
+    context->SP = 0xFF; // Stack pointer to $FF
+    // context->PC = CPU_MEMORY[0xFFFC] | (CPU_MEMORY[0xFFFD] << 8); // Reset vector
 }
 
 uint16_t getInstructionLength(const Instruction *instruction) {
@@ -70,8 +73,8 @@ uint16_t cpu_getJumpAddress(AddressingMode mode) {
     if (mode == AddressingAbsolute) {
         // Get next two bytes in little endian format.
         // We need to look ahead one extra byte because the actual instruction hasn't updated PC yet.
-        uint8_t low = MEMORY[PC + 1 + 0];
-        uint8_t high = MEMORY[PC + 1 + 1];
+        uint8_t low = CPU_MEMORY[PC + 1 + 0];
+        uint8_t high = CPU_MEMORY[PC + 1 + 1];
         uint16_t newAddress = high * 0x100 + low;
         return newAddress;
     }
@@ -94,7 +97,7 @@ ExecutionResult tick(ExecutionContext *context) {
 
 ExecutionResult executeNext(ExecutionContext *context) {
     // fetch opcode
-    const uint8_t opcode = MEMORY[PC];
+    const uint8_t opcode = CPU_MEMORY[PC];
     Instruction *instruction = OpcodeTable[opcode];
     if (!instruction) {
         // We could be processing DATA instead of an OPCODE.
@@ -136,7 +139,7 @@ ExecutionResult executeNext(ExecutionContext *context) {
                 case AddressingZeroPageX:
                 case AddressingXIndirect:
                 case AddressingIndirectY: {
-                    const uint8_t operand = MEMORY[PC + 1];
+                    const uint8_t operand = CPU_MEMORY[PC + 1];
                     if (isDecimal()) {
                         cpu_exec_adc_bcd(context, operand);
                     } else {
@@ -202,6 +205,7 @@ ExecutionResult executeNext(ExecutionContext *context) {
     return RUNNING;
 }
 
+// TODO check how the overflow flag should work for all the ADC's
 void cpu_exec_adc(ExecutionContext *context, uint8_t operand) {
     const unsigned int sum = ACCUM + operand + (isCarry() ? 1 : 0);
     // Overflow flag is set if the twos complement (signed) result is > +127 or < -128.
