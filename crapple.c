@@ -54,6 +54,9 @@ int crapple_init() {
     // Load character ROM
     crapple_load_char_rom();
 
+    // Init audio
+    crapple_init_audio();
+
     MCS6502Init(&context, readBytesFn, writeBytesFn, NULL);
     MCS6502Reset(&context);
     // MCS6502Tick(&context);
@@ -63,6 +66,45 @@ int crapple_init() {
     // printf("Waiting for Ctrl + Reset...\n");
 
     return 0;
+}
+
+int crapple_init_audio() {
+    // Audio setup
+    SDL_zero(audio_spec);
+    audio_spec.freq = SAMPLE_RATE;
+    audio_spec.format = AUDIO_S16SYS; // 16-bit signed
+    audio_spec.channels = 1; // Mono
+    audio_spec.samples = 1024; // Buffer size
+    audio_spec.callback = crapple_audio_callback;
+    audio_spec.userdata = NULL;
+
+    if (SDL_OpenAudio(&audio_spec, NULL) < 0) {
+        fprintf(stderr, "SDL_OpenAudio failed: %s\n", SDL_GetError());
+        crapple_terminate();
+        return 1;
+    }
+    SDL_PauseAudio(0); // Start audio
+
+    return 0;
+}
+
+void crapple_audio_callback(void *userdata, Uint8 *stream, int len) {
+    int16_t *buffer = (int16_t *) stream; // 16-bit signed samples
+    const int samples = len / sizeof(int16_t);
+
+    for (int i = 0; i < samples; i++) {
+        if (speaker_toggle) {
+            // Square wave: +32767 or -32767 based on state
+            buffer[i] = speaker_state ? 32767 : -32767;
+            sample_pos++;
+            if (sample_pos >= SAMPLES_PER_TOGGLE) {
+                speaker_toggle = false; // Stop after half-period
+                sample_pos = 0;
+            }
+        } else {
+            buffer[i] = 0; // Silence
+        }
+    }
 }
 
 void crapple_update() {
@@ -222,7 +264,6 @@ void crapple_update() {
 
                 if (apple_key != 0x00) {
                     simulate_key_press(apple_key);
-                    printf("Key pressed: %c (0x%02X)\n", apple_key < 0x20 ? '.' : apple_key, apple_key);
                 }
             }
         }
@@ -236,7 +277,8 @@ void crapple_update() {
         crapple_render_text_page_1();
 
         // Flash cursor
-        // crapple_handle_cursor();
+        flash_on = (cursor_timer / 16) % 2 == 0;
+        cursor_timer--;
 
         SDL_UpdateTexture(texture, NULL, pixels, WIDTH * sizeof(uint32_t));
         SDL_RenderClear(renderer);
@@ -252,6 +294,7 @@ void crapple_update() {
 }
 
 void crapple_terminate() {
+    SDL_CloseAudio();  // Shut down audio
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
@@ -285,13 +328,38 @@ void crapple_terminate() {
 void crapple_render_text_page_1() {
     for (int row = 0; row < 24; row++) {
         for (int col = 0; col < 40; col++) {
-            uint8_t chr = MEMORY[row_start_addresses[row] + col]; // 0x00-0xFF directly
+            uint8_t chr = MEMORY[row_start_addresses[row] + col];
+            uint8_t glyph_idx = chr;
+            uint32_t fg_color = 0xFF00FF00; // Green (normal)
+            uint32_t bg_color = 0xFF000000; // Black (background)
+
+            // Handle character modes
+            if (chr >= 0x00 && chr <= 0x3F) {
+                // Inverse
+                glyph_idx = chr | 0x40; // Map to normal glyph
+                fg_color = 0xFF000000; // Black foreground
+                bg_color = 0xFF00FF00; // Green background
+            } else if (chr >= 0x40 && chr <= 0x7F) {
+                // Flashing
+                glyph_idx = chr & 0x3F; // Base glyph
+                if (flash_on) {
+                    fg_color = 0xFF000000; // Black foreground (inverse)
+                    bg_color = 0xFF00FF00; // Green background
+                } else {
+                    fg_color = 0xFF00FF00; // Green foreground (normal)
+                    bg_color = 0xFF000000; // Black background
+                }
+            } else {
+                // Normal (0x80-0xFF)
+                glyph_idx = chr & 0x7F; // Strip high bit
+            }
+
             for (int y = 0; y < 8; y++) {
-                uint8_t glyphRow = FONT[chr][y]; // Use full 256-char index
+                uint8_t glyphRow = FONT[glyph_idx][y];
                 for (int x = 0; x < 7; x++) {
-                    int px = col * 7 + x; // Native 280x192
+                    int px = col * 7 + x;
                     int py = row * 8 + y;
-                    pixels[py * WIDTH + px] = (glyphRow & (1 << (6 - x))) ? 0xFF00FF00 : 0xFF000000;
+                    pixels[py * WIDTH + px] = (glyphRow & (1 << (6 - x))) ? fg_color : bg_color;
                 }
             }
         }
