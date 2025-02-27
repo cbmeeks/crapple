@@ -57,6 +57,11 @@ int crapple_init() {
     // Init audio
     crapple_init_audio();
 
+    // Initialize paste buffer
+    memset(paste_buffer, 0, MAX_PASTE_BUFFER);
+    paste_active = false;
+    paste_index = 0;
+
     MCS6502Init(&context, readBytesFn, writeBytesFn, NULL);
     MCS6502Reset(&context);
     // MCS6502Tick(&context);
@@ -132,6 +137,21 @@ void crapple_update() {
                     simulate_key_press(0x12); // Ctrl+R
                     // context.pc = 0xFF59;      // Jump to warm start
                     reset_triggered = true;
+                    continue;
+                }
+
+                // Hotkey for paste: Shift+Insert
+                if (key == SDLK_INSERT && (mod & KMOD_SHIFT)) {
+                    char* clipboard = SDL_GetClipboardText();
+                    if (clipboard && strlen(clipboard) > 0 && strlen(clipboard) < MAX_PASTE_BUFFER) {
+                        strncpy(paste_buffer, clipboard, MAX_PASTE_BUFFER - 1);
+                        paste_buffer[MAX_PASTE_BUFFER - 1] = '\0';
+                        paste_active = true;
+                        paste_index = 0;
+                        paste_delay = 0;
+                        printf("Pasting: %s\n", paste_buffer);
+                    }
+                    SDL_free(clipboard);
                     continue;
                 }
 
@@ -268,6 +288,27 @@ void crapple_update() {
                     simulate_key_press(apple_key);
                 }
             }
+        }
+
+        // Handle pasting one character per frame
+        // Paste one character when buffer is ready and delay has elapsed
+        if (paste_active && paste_buffer[paste_index] != '\0' && !key_available && paste_delay == 0) {
+            uint8_t apple_key = paste_buffer[paste_index];
+            if (apple_key >= 'a' && apple_key <= 'z') {
+                apple_key = apple_key - 'a' + 'A';  // Uppercase
+            } else if (apple_key == '\n') {
+                apple_key = 0x0D;  // Carriage return
+                paste_delay = 10;   // Longer delay after CR (10 frames ~166 ms)
+            } else {
+                paste_delay = 3;    // Normal delay (3 frames ~50 ms)
+            }
+            simulate_key_press(apple_key);
+            paste_index++;
+        } else if (paste_active && paste_buffer[paste_index] == '\0') {
+            paste_active = false;
+            paste_delay = 0;
+        } else if (paste_delay > 0) {
+            paste_delay--;  // Countdown delay
         }
 
         // CPU update: Run ~17,050 cycles per frame

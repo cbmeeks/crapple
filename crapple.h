@@ -10,15 +10,27 @@
 
 #define WIDTH 280
 #define HEIGHT 192
-#define SCALE 4
-#define WINDOW_WIDTH (WIDTH * SCALE)  // 1120
-#define WINDOW_HEIGHT (HEIGHT * SCALE) // 768
+
+#define SCALE 2
+#define WINDOW_WIDTH (WIDTH * SCALE)  // 560
+#define WINDOW_HEIGHT (HEIGHT * SCALE) // 384
+
+// #define SCALE 4
+// #define WINDOW_WIDTH (WIDTH * SCALE)  // 1120
+// #define WINDOW_HEIGHT (HEIGHT * SCALE) // 768
 
 // Main memory
 uint8_t MEMORY[0x10000]; //  64KiB Memory
 
 // Pixel buffer (for the SDL texture)
 uint32_t pixels[WIDTH * HEIGHT]; // ARGB8888 format
+
+// Keyboard
+#define MAX_PASTE_BUFFER 4096  // Max characters to paste
+static char paste_buffer[MAX_PASTE_BUFFER];  // Buffer for clipboard text
+static bool paste_active = false;            // Flag to start pasting
+static int paste_index = 0;                  // Current position in paste buffer
+static int paste_delay = 0;
 
 //  Reference
 //  https://grok.com/share/bGVnYWN5_eef0322c-1ebb-40d3-9eae-1d92acc84400
