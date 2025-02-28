@@ -21,3 +21,16 @@
 ## Example Programs
 
 https://github.com/LinesGuy/misc-applesoft-programs
+
+## Graphics
+ 
+| Address | Function |
+|---------|----------|
+| TXTCLR  | 0xC050   |
+| TXTSET  | 0xC051   |
+| MIXCLR  | 0xC052   |
+| MIXSET  | 0xC053   |
+| LOWSCR  | 0xC054   |
+| HISCR   | 0xC055   |
+| LORES   | 0xC056   |
+| HIRES   | 0xC057   |
